@@ -1,0 +1,54 @@
+[http.middlewares.simpleAuth.basicAuth]
+  users = [
+    "admin:$apr1$lF4yH1dB$yKE9PxtpNmjBFcYtnwNTe0"
+  ]
+
+# Use with traefik.http.routers.myRouter.middlewares: "redirect-www-to-main@file"
+[http.middlewares]
+  [http.middlewares.redirect-www-to-main.redirectregex]
+      permanent = true
+      regex = "^https?://www\\.(.+)"
+      replacement = "https://${1}"
+
+[http.routers.api]
+  rule = "Host(`traefik.arquitetodebolso.com.br`)"
+  entrypoints = ["websecure"]
+  middlewares = ["simpleAuth"]
+  service = "api@internal"
+  [http.routers.api.tls]
+    certResolver = "lets-encrypt"
+
+# SigNoz - Configuração para instalação oficial (serviço unificado)
+[http.routers.signoz-https]
+  rule = "Host(`signoz.arquitetodebolso.com.br`)"
+  entrypoints = ["websecure"]
+  service = "signoz-service"
+  priority = 1
+  [http.routers.signoz-https.tls]
+    certResolver = "lets-encrypt"
+
+[http.routers.signoz-http]
+  rule = "Host(`signoz.arquitetodebolso.com.br`)"
+  entrypoints = ["web"]
+  service = "signoz-service"
+  priority = 1
+
+[http.services.signoz-service.loadBalancer]
+  [[http.services.signoz-service.loadBalancer.servers]]
+    url = "http://signoz:8080"
+
+# ============================================
+# EXEMPLO: Proxy para VPS 2 (APIs de Produção)
+# ============================================
+# Descomente e configure quando tiver a VPS 2
+
+# [http.routers.api-producao-https]
+#   rule = "Host(`api.arquitetodebolso.com.br`)"
+#   entrypoints = ["websecure"]
+#   service = "api-producao-service"
+#   [http.routers.api-producao-https.tls]
+#     certResolver = "lets-encrypt"
+
+# [http.services.api-producao-service.loadBalancer]
+#   [[http.services.api-producao-service.loadBalancer.servers]]
+#     url = "http://IP_VPS_2:PORTA"  # Ex: http://195.200.1.130:3000

@@ -1,0 +1,117 @@
+services:
+  postgres:
+    image: postgres:14
+    container_name: prefect-postgres
+    networks:
+      - infra
+    environment:
+      POSTGRES_USER: prefect
+      POSTGRES_PASSWORD: prefect
+      POSTGRES_DB: prefect
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prefect"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  redis:
+    image: redis:7
+    container_name: prefect-redis
+    networks:
+      - infra
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  prefect-server:
+    image: prefecthq/prefect:3-latest
+    container_name: prefect-server
+    networks:
+      - infra
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prefect.rule=Host(`prefect.arquitetodebolso.com.br`)"
+      - "traefik.http.routers.prefect.tls=true"
+      - "traefik.http.routers.prefect.tls.certresolver=lets-encrypt"
+      - "traefik.http.services.prefect.loadbalancer.server.port=4200"
+      - "traefik.docker.network=infra"
+
+    environment:
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://prefect:prefect@postgres:5432/prefect
+      PREFECT_SERVER_API_HOST: 0.0.0.0
+      PREFECT_SERVER_API_PORT: 4200
+
+      PREFECT_MESSAGING_BROKER: prefect_redis.messaging
+      PREFECT_MESSAGING_CACHE: prefect_redis.messaging
+      PREFECT_REDIS_MESSAGING_HOST: redis
+      PREFECT_REDIS_MESSAGING_PORT: 6379
+      PREFECT_REDIS_MESSAGING_DB: 0
+
+      PREFECT_UI_URL: https://prefect.arquitetodebolso.com.br
+      PREFECT_API_URL: https://prefect.arquitetodebolso.com.br/api
+
+    command: prefect server start --no-services
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:4200/api/health', timeout=1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: always
+
+  prefect-services:
+    image: prefecthq/prefect:3-latest
+    container_name: prefect-services
+    networks:
+      - infra
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+    environment:
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://prefect:prefect@postgres:5432/prefect
+      PREFECT_MESSAGING_BROKER: prefect_redis.messaging
+      PREFECT_MESSAGING_CACHE: prefect_redis.messaging
+      PREFECT_REDIS_MESSAGING_HOST: redis
+      PREFECT_REDIS_MESSAGING_PORT: 6379
+      PREFECT_REDIS_MESSAGING_DB: 0
+    command: prefect server services start
+    restart: always
+
+  prefect-worker:
+    build:
+      context: .
+    container_name: prefect-worker
+    networks:
+      - infra
+    volumes:
+      - ./flows:/opt/prefect/flows
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+    environment:
+      PREFECT_API_URL: http://prefect-server:4200/api
+    command: prefect worker start --pool local-pool
+    restart: on-failure
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  infra:
+    external: true

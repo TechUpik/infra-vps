@@ -1,0 +1,38 @@
+[entryPoints]
+  [entryPoints.web]
+    address = ":80"
+    
+    [entryPoints.web.http]
+      [entryPoints.web.http.redirections]
+        [entryPoints.web.http.redirections.entryPoint]
+          to = "websecure"
+          scheme = "https"
+
+  [entryPoints.websecure]
+    address = ":443"
+
+[log]
+  level = "WARN"
+
+[accessLog]
+
+[metrics]
+  [metrics.prometheus]
+    addEntryPointsLabels = true
+    addServicesLabels = true
+    addRoutersLabels = true
+
+[api]
+  dashboard = true
+
+[certificatesResolvers.lets-encrypt.acme]
+  email = "ti@arquitetodebolso.com.br"
+  storage = "acme.json"
+  [certificatesResolvers.lets-encrypt.acme.tlsChallenge]
+
+[providers.docker]
+  watch = true
+  network = "infra"
+
+[providers.file]
+  filename = "/etc/traefik/traefik_dynamic.toml"
