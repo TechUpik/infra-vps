@@ -1,0 +1,6 @@
+# Python
+__pycache__/
+*.pyc
+
+# Traefik (contém certificados TLS privados)
+traefik/acme.json
