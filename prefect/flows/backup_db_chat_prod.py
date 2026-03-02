@@ -55,7 +55,7 @@ def upload_to_azure_blob(data: bytes):
     container = blob_service.get_container_client(container_name)
 
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    blob_name = f"prod_full_backup_{timestamp}.json.gz"
+    blob_name = f"chat_prod_full_backup_{timestamp}.json.gz"
 
     container.upload_blob(
         name=blob_name,
